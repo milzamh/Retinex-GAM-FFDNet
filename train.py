@@ -16,9 +16,6 @@ parser.add_argument('--patch_size', dest='patch_size', type=int, default=96,
                     help='patch size')
 parser.add_argument('--lr', dest='lr', type=float, default=0.001,
                     help='initial learning rate')
-parser.add_argument('--data_dir', dest='data_dir',
-                    default='/disk1/aashishsharma/Datasets/RetinexNet_Dataset/',
-                    help='directory storing the training data')
 parser.add_argument('--ckpt_dir', dest='ckpt_dir', default='./ckpts/',
                     help='directory for checkpoints')
 
@@ -29,14 +26,15 @@ def train(model):
     lr = args.lr * np.ones([args.epochs])
     lr[20:] = lr[0] / 10.0
 
-    train_low_data_names = glob(args.data_dir + '/data/our485/low/*.png') + \
-                           glob(args.data_dir + '/data/syn/low/*.png')
+    train_low_data_names = glob('/content/drive/MyDrive/SKRIPSIII/data/train/low/*.jpg')
     train_low_data_names.sort()
-    train_high_data_names= glob(args.data_dir + '/data/our485/high/*.png') + \
-                           glob(args.data_dir + '/data/syn/high/*.png')
+    train_high_data_names= glob('/content/drive/MyDrive/SKRIPSIII/data/train/high/*.jpg')
     train_high_data_names.sort()
-    eval_low_data_names  = glob(args.data_dir + '/eval/low/*.*')
+    eval_low_data_names  = glob('/content/drive/MyDrive/SKRIPSIII/data/eval/low/*.*')
     eval_low_data_names.sort()
+    MAX_TRAIN = 1500
+    train_low_data_names  = train_low_data_names[:MAX_TRAIN]
+    train_high_data_names = train_high_data_names[:MAX_TRAIN]
     assert len(train_low_data_names) == len(train_high_data_names)
     print('Number of training data: %d' % len(train_low_data_names))
 

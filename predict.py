@@ -1,4 +1,6 @@
 import os
+os.environ['PYTORCH_ALLOC_CONF'] = 'expandable_segments:True'
+
 import argparse
 from glob import glob
 import numpy as np
@@ -10,7 +12,7 @@ parser.add_argument('--gpu_id', dest='gpu_id',
                     default="0",
                     help='GPU ID (-1 for CPU)')
 parser.add_argument('--data_dir', dest='data_dir',
-                    default='./data/test/low/',
+                    default='/content/drive/MyDrive/SKRIPSIII/data/test/low',
                     help='directory storing the test data')
 parser.add_argument('--ckpt_dir', dest='ckpt_dir', 
                     default='./ckpts/',
