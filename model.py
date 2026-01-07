@@ -1,7 +1,6 @@
 import os
 import time
 import random
-import gc
 
 from PIL import Image
 import torch
@@ -349,102 +348,59 @@ class RetinexNet(nn.Module):
                 self.save(iter_num, ckpt_dir)
 
         print("Finished training for phase %s." % train_phase)
-   
+
+
     def predict(self,
-                    test_low_data_names,
-                    res_dir,
-                    ckpt_dir):
+                test_low_data_names,
+                res_dir,
+                ckpt_dir):
 
-            # Load the network with a pre-trained checkpoint
-            self.train_phase= 'Decom'
-            load_model_status, _ = self.load(ckpt_dir)
-            if load_model_status:
-                print(self.train_phase, "  : Model restore success!")
+        # Load the network with a pre-trained checkpoint
+        self.train_phase= 'Decom'
+        load_model_status, _ = self.load(ckpt_dir)
+        if load_model_status:
+            print(self.train_phase, "  : Model restore success!")
+        else:
+            print("No pretrained model to restore!")
+            raise Exception
+        self.train_phase= 'Relight'
+        load_model_status, _ = self.load(ckpt_dir)
+        if load_model_status:
+             print(self.train_phase, ": Model restore success!")
+        else:
+            print("No pretrained model to restore!")
+            raise Exception
+
+        # Set this switch to True to also save the reflectance and shading maps
+        save_R_L = False
+        
+        # Predict for the test images
+        for idx in range(len(test_low_data_names)):
+            test_img_path  = test_low_data_names[idx]
+            test_img_name  = test_img_path.split('/')[-1]
+            print('Processing ', test_img_name)
+            test_low_img   = Image.open(test_img_path)
+            test_low_img   = np.array(test_low_img, dtype="float32")/255.0
+            test_low_img   = np.transpose(test_low_img, (2, 0, 1))
+            input_low_test = np.expand_dims(test_low_img, axis=0)
+
+            self.forward(input_low_test, input_low_test)
+            result_1 = self.output_R_low
+            result_2 = self.output_I_low
+            result_3 = self.output_I_delta
+            result_4 = self.output_S
+            input = np.squeeze(input_low_test)
+            result_1 = np.squeeze(result_1)
+            result_2 = np.squeeze(result_2)
+            result_3 = np.squeeze(result_3)
+            result_4 = np.squeeze(result_4)
+            if save_R_L:
+                cat_image= np.concatenate([input, result_1, result_2, result_3, result_4], axis=2)
             else:
-                print("No pretrained model to restore!")
-                raise Exception
-            self.train_phase= 'Relight'
-            load_model_status, _ = self.load(ckpt_dir)
-            if load_model_status:
-                print(self.train_phase, ": Model restore success!")
-            else:
-                print("No pretrained model to restore!")
-                raise Exception
+                cat_image= np.concatenate([input, result_4], axis=2)
 
-            # Set this switch to True to also save the reflectance and shading maps
-            save_R_L = False
-            
-            # Predict for the test images
-            for idx in range(len(test_low_data_names)):
-                test_img_path  = test_low_data_names[idx]
-                test_img_name  = test_img_path.split('/')[-1]
-                print('Processing ', test_img_name)
-                test_low_img   = Image.open(test_img_path)
-                
-                # Convert to RGB to ensure 3 channels (remove alpha if present)
-                if test_low_img.mode != 'RGB':
-                    test_low_img = test_low_img.convert('RGB')
-                
-                # Check if image is too large and resize if necessary
-                max_dim = 2048  # Reduced to 2048 to be safer
-                width, height = test_low_img.size
-                
-                # Calculate total pixels to ensure we don't exceed limits
-                total_pixels = width * height
-                max_pixels = 2048 * 2048  # ~4 million pixels
-                
-                if width > max_dim or height > max_dim or total_pixels > max_pixels:
-                    print(f'  Warning: Image too large ({width}x{height}), resizing...')
-                    # Calculate new dimensions while maintaining aspect ratio
-                    if total_pixels > max_pixels:
-                        # Scale down based on total pixels
-                        scale = (max_pixels / total_pixels) ** 0.5
-                        new_width = int(width * scale)
-                        new_height = int(height * scale)
-                    else:
-                        # Scale down based on max dimension
-                        if width > height:
-                            new_width = max_dim
-                            new_height = int(height * (max_dim / width))
-                        else:
-                            new_height = max_dim
-                            new_width = int(width * (max_dim / height))
-                    
-                    test_low_img = test_low_img.resize((new_width, new_height), Image.LANCZOS)
-                    print(f'  Resized to: {new_width}x{new_height}')
-                
-                test_low_img   = np.array(test_low_img, dtype="float32")/255.0
-                test_low_img   = np.transpose(test_low_img, (2, 0, 1))
-                input_low_test = np.expand_dims(test_low_img, axis=0)
-
-                # Wrap forward pass in no_grad to prevent gradient accumulation
-                with torch.no_grad():
-                    self.forward(input_low_test, input_low_test)
-                    result_1 = self.output_R_low
-                    result_2 = self.output_I_low
-                    result_3 = self.output_I_delta
-                    result_4 = self.output_S
-                    
-                input = np.squeeze(input_low_test)
-                result_1 = np.squeeze(result_1)
-                result_2 = np.squeeze(result_2)
-                result_3 = np.squeeze(result_3)
-                result_4 = np.squeeze(result_4)
-                if save_R_L:
-                    cat_image= np.concatenate([input, result_1, result_2, result_3, result_4], axis=2)
-                else:
-                    cat_image= np.concatenate([input, result_4], axis=2)
-
-                cat_image = np.transpose(cat_image, (1, 2, 0))
-                # print(cat_image.shape)
-                im = Image.fromarray(np.clip(cat_image * 255.0, 0, 255.0).astype('uint8'))
-                filepath = res_dir + '/' + test_img_name
-                im.save(filepath[:-4] + '.jpg')
-                
-                # Clear memory after each image
-                torch.cuda.empty_cache()
-                
-                # More aggressive cleanup every 5 images
-                if (idx + 1) % 5 == 0:
-                    gc.collect()
-                    print(f'Memory cleared after {idx + 1} images')
+            cat_image = np.transpose(cat_image, (1, 2, 0))
+            # print(cat_image.shape)
+            im = Image.fromarray(np.clip(cat_image * 255.0, 0, 255.0).astype('uint8'))
+            filepath = res_dir + '/' + test_img_name
+            im.save(filepath[:-4] + '.jpg')
