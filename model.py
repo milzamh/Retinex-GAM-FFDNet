@@ -9,6 +9,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
+from models.network_ffdnet import FFDNet
 
 
 class DecomNet(nn.Module):
@@ -101,6 +102,21 @@ class RetinexNet(nn.Module):
 
         self.DecomNet  = DecomNet()
         self.RelightNet= RelightNet()
+        self.ffdnet = FFDNet(
+            in_nc=3,
+            out_nc=3,
+            nc=96,
+            nb=12,
+            act_mode='R'
+        )
+        
+        ffdnet_ckpt = 'modelzoo/ffdnet_color.pth'
+        ckpt = torch.load(ffdnet_ckpt, map_location=lambda s, l: s)
+        self.ffdnet.load_state_dict(ckpt, strict=True)
+
+        self.ffdnet.eval()
+        for p in self.ffdnet.parameters():
+            p.requires_grad = False
 
     def forward(self, input_low, input_high):
         # Forward DecompNet
@@ -108,6 +124,14 @@ class RetinexNet(nn.Module):
         input_high= Variable(torch.FloatTensor(torch.from_numpy(input_high))).cuda()
         R_low, I_low   = self.DecomNet(input_low)
         R_high, I_high = self.DecomNet(input_high)
+        
+        sigma = torch.full(
+            (R_low.size(0), 1, 1, 1),
+            15/255.0,
+            device=R_low.device
+        )
+
+        R_low = self.ffdnet(R_low, sigma)
 
         # Forward RelightNet
         I_delta = self.RelightNet(I_low, R_low)
