@@ -110,7 +110,7 @@ class RetinexNet(nn.Module):
             act_mode='R'
         )
         
-        ffdnet_ckpt = 'modelzoo/ffdnet_color.pth'
+        ffdnet_ckpt = 'modelzoo/ffdnet_color_poisson.pth'
         ckpt = torch.load(ffdnet_ckpt, map_location=lambda s, l: s)
         self.ffdnet.load_state_dict(ckpt, strict=True)
 
