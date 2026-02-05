@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 from models.network_ffdnet import FFDNet
+from models.gam import GAM
 
 
 class DecomNet(nn.Module):
@@ -72,6 +73,7 @@ class RelightNet(nn.Module):
 
         self.net2_fusion = nn.Conv2d(channel*3, channel, kernel_size=1,
                                      padding=1, padding_mode='replicate')
+        self.gam = GAM(in_channels=channel, out_channels=channel)
         self.net2_output = nn.Conv2d(channel, 1, kernel_size=3, padding=0)
 
     def forward(self, input_L, input_R):
@@ -92,6 +94,7 @@ class RelightNet(nn.Module):
         deconv2_rs= F.interpolate(deconv2, size=(input_R.size()[2], input_R.size()[3]))
         feats_all = torch.cat((deconv1_rs, deconv2_rs, deconv3), dim=1)
         feats_fus = self.net2_fusion(feats_all)
+        feats_fus = self.gam(feats_fus)
         output    = self.net2_output(feats_fus)
         return output
 

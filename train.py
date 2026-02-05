@@ -16,7 +16,7 @@ parser.add_argument('--patch_size', dest='patch_size', type=int, default=96,
                     help='patch size')
 parser.add_argument('--lr', dest='lr', type=float, default=0.001,
                     help='initial learning rate')
-parser.add_argument('--ckpt_dir', dest='ckpt_dir', default='/content/drive/MyDrive/SKRIPSIII/checkpoints/ckpts/with FFDNet ONLY',
+parser.add_argument('--ckpt_dir', dest='ckpt_dir', default='./ckpts/',
                     help='directory for checkpoints')
 
 args = parser.parse_args()
